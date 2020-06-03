@@ -27,6 +27,7 @@ from pyndn.name import Name
 from pyndn.encoding.tlv.tlv_encoder import TlvEncoder
 from pyndn.encoding.tlv.tlv_decoder import TlvDecoder
 from pyndn.encoding.tlv_0_2_wire_format import Tlv0_2WireFormat
+from pyndn.encoding.tlv_0_3_wire_format import Tlv0_3WireFormat
 from pyndn.util.blob import Blob
 
 class PSyncState(object):
@@ -79,7 +80,7 @@ class PSyncState(object):
 
         # Encode backwards.
         for i in range(len(self._content) - 1, -1, -1):
-            Tlv0_2WireFormat._encodeName(self._content[i], encoder)
+            Tlv0_3WireFormat._encodeName(self._content[i], encoder)
 
         encoder.writeTypeAndLength(
           PSyncState.Tlv_PSyncContent, len(encoder) - saveLength)
@@ -106,7 +107,7 @@ class PSyncState(object):
         # Decode a sequence of Name.
         while decoder.getOffset() < len(decodeBuffer):
             name = Name()
-            Tlv0_2WireFormat._decodeName(name, decoder, True)
+            Tlv0_3WireFormat._decodeName(name, decoder, True)
             self._content.append(name)
 
         decoder.finishNestedTlvs(endOffset)

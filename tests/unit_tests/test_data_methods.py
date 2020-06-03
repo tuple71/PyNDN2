@@ -28,7 +28,7 @@ from pyndn import GenericSignature
 from pyndn.encoding import TlvWireFormat
 from pyndn.lp.lp_packet import LpPacket
 from pyndn.util import Blob
-from .test_utils import dump, CredentialStorage
+from test_utils import dump, CredentialStorage
 import unittest as ut
 
 # use Python 3's mock library if it's available
@@ -64,6 +64,44 @@ codedData = Blob(bytearray([
     0x7F, 0xB4, 0x64, 0xA0, 0xEE, 0x22, 0x82, 0xC8, 0x34, 0xF7, 0x9A, 0xF5, 0x51, 0x12, 0x2A, 0x84,
 1
   ]))
+
+codedData2 = Blob(bytearray([
+  0x06, 0xc5, # Data
+    0x07, 0x14, # Name
+        0x08, 0x05,
+            0x6c, 0x6f, 0x63, 0x61, 0x6c,
+        0x08, 0x03,
+            0x6e, 0x64, 0x6e,
+        0x08, 0x06,
+            0x70, 0x72, 0x65, 0x66, 0x69, 0x78,
+    0x14, 0x04, # MetaInfo
+        0x19, 0x02, # FreshnessPeriod
+            0x27, 0x10,
+    0x15, 0x08, # Content
+        0x53, 0x55, 0x43, 0x43, 0x45, 0x53, 0x53, 0x21,
+    0x16, 0x1b, # SignatureInfo
+        0x1b, 0x01, # SignatureType
+            0x01,
+        0x1c, 0x16, # KeyLocator
+            0x07, 0x14, # Name
+                0x08, 0x04,
+                    0x74, 0x65, 0x73, 0x74,
+                0x08, 0x03,
+                    0x6b, 0x65, 0x79,
+                0x08, 0x07,
+                    0x6c, 0x6f, 0x63, 0x61, 0x74, 0x6f, 0x72,
+    0x17, 0x80, # SignatureValue
+        0x2f, 0xd6, 0xf1, 0x6e, 0x80, 0x6f, 0x10, 0xbe, 0xb1, 0x6f, 0x3e, 0x31, 0xec,
+        0xe3, 0xb9, 0xea, 0x83, 0x30, 0x40, 0x03, 0xfc, 0xa0, 0x13, 0xd9, 0xb3, 0xc6,
+        0x25, 0x16, 0x2d, 0xa6, 0x58, 0x41, 0x69, 0x62, 0x56, 0xd8, 0xb3, 0x6a, 0x38,
+        0x76, 0x56, 0xea, 0x61, 0xb2, 0x32, 0x70, 0x1c, 0xb6, 0x4d, 0x10, 0x1d, 0xdc,
+        0x92, 0x8e, 0x52, 0xa5, 0x8a, 0x1d, 0xd9, 0x96, 0x5e, 0xc0, 0x62, 0x0b, 0xcf,
+        0x3a, 0x9d, 0x7f, 0xca, 0xbe, 0xa1, 0x41, 0x71, 0x85, 0x7a, 0x8b, 0x5d, 0xa9,
+        0x64, 0xd6, 0x66, 0xb4, 0xe9, 0x8d, 0x0c, 0x28, 0x43, 0xee, 0xa6, 0x64, 0xe8,
+        0x55, 0xf6, 0x1c, 0x19, 0x0b, 0xef, 0x99, 0x25, 0x1e, 0xdc, 0x78, 0xb3, 0xa7,
+        0xaa, 0x0d, 0x14, 0x58, 0x30, 0xe5, 0x37, 0x6a, 0x6d, 0xdb, 0x56, 0xac, 0xa3,
+        0xfc, 0x90, 0x7a, 0xb8, 0x66, 0x9c, 0x0e, 0xf6, 0xb7, 0x64, 0xd1
+    ]))
 
 experimentalSignatureType = 100
 experimentalSignatureInfo = Blob(bytearray([
@@ -193,6 +231,14 @@ initialDump = ['name: /ndn/abc',
         'signature.signature: 1a03c39c4fc55c36a2e79cee52fe45a7e10cfb95acb49bccb6a0c34aaa45bfbfdf0b51d5a48bf2ab45971c24d8e2c28a4d4012d77701eb7435f14dddd0f3a69ab7a4f17fa78434d7082552808b6c4293041e071f4f764318f2f8511a56afe6a931cb6c1c0aa40110fcc866ce2e9c0b2d7fb464a0ee2282c834f79af551122a84',
         'signature.keyLocator: KeyName: /testname/KEY/DSK-123/ID-CERT']
 
+initialDump2 = [
+'name: /local/ndn/prefix',
+'content (raw): SUCCESS!',
+'content (hex): 5355434345535321', 
+'metaInfo.freshnessPeriod (milliseconds): 10000.0',
+'metaInfo.finalBlockId: <none>',
+'signature.signature: 2fd6f16e806f10beb16f3e31ece3b9ea83304003fca013d9b3c625162da65841696256d8b36a387656ea61b232701cb64d101ddc928e52a58a1dd9965ec0620bcf3a9d7fcabea14171857a8b5da964d666b4e98d0c2843eea664e855f61c190bef99251edc78b3a7aa0d145830e5376a6ddb56aca3fc907ab8669c0ef6b764d1', 
+'signature.keyLocator: KeyName: /test/key/locator']
 
 def dataDumpsEqual(d1, d2):
     #ignoring signature, see if two data dumps are equal
@@ -223,13 +269,13 @@ class TestDataDump(ut.TestCase):
 
     def test_encode_decode(self):
         data = Data()
-        data.wireDecode(codedData)
+        data.wireDecode(codedData2)
         data.setContent(data.getContent())
         encoding = data.wireEncode()
 
         reDecodedData = Data()
         reDecodedData.wireDecode(encoding)
-        self.assertEqual(dumpData(reDecodedData), initialDump, 'Re-decoded data does not match original dump')
+        self.assertEqual(dumpData(reDecodedData), initialDump2, 'Re-decoded data does not match original dump')
 
     def test_empty_signature(self):
         # make sure nothing is set in the signature of newly created data
@@ -333,7 +379,7 @@ class TestDataDump(ut.TestCase):
 
     def test_full_name(self):
         data = Data()
-        data.wireDecode(codedData)
+        data.wireDecode(codedData2)
 
         # Check the full name format.
         self.assertEqual(data.getFullName().size(), data.getName().size() + 1)
@@ -342,14 +388,17 @@ class TestDataDump(ut.TestCase):
 
         # Check the independent digest calculation.
         sha256 = hashes.Hash(hashes.SHA256(), backend=default_backend())
-        sha256.update(Blob(codedData).toBytes())
+        sha256.update(Blob(codedData2).toBytes())
         newDigest = Blob(bytearray(sha256.finalize()), False)
         self.assertTrue(newDigest.equals(data.getFullName().get(-1).getValue()))
 
         # Check the expected URI.
+        #self.assertEqual(
+        #  data.getFullName().toUri(), "/ndn/abc/sha256digest=" +
+        #    "96556d685dcb1af04be4ae57f0e7223457d4055ea9b3d07c0d337bef4a8b3ee9")
         self.assertEqual(
-          data.getFullName().toUri(), "/ndn/abc/sha256digest=" +
-            "96556d685dcb1af04be4ae57f0e7223457d4055ea9b3d07c0d337bef4a8b3ee9")
+          data.getFullName().toUri(), "/local/ndn/prefix/sha256digest=" +
+            "28bad4b5275bd392dbb670c75cf0b66f13f7942b21e80f55c0e86b374753a548")
 
         # Changing the Data packet should change the full name.
         saveFullName = Name(data.getFullName())

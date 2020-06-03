@@ -25,8 +25,9 @@ for the name component type ImplicitSha256Digest.
 """
 
 from pyndn.encoding.tlv_0_2_wire_format import Tlv0_2WireFormat
+from pyndn.encoding.tlv_0_3_wire_format import Tlv0_3WireFormat
 
-class Tlv0_1_1WireFormat(Tlv0_2WireFormat):
+class Tlv0_1_1WireFormat(Tlv0_3WireFormat):
     _instance = None
 
     @classmethod

@@ -128,10 +128,6 @@ class CertificateCacheV2(object):
         else:
             interest = certificatePrefixOrInterest
 
-            if interest.getChildSelector() != None:
-                logging.getLogger(__name__).error(
-                  "Certificate search using a ChildSelector is not supported. Searching as if this selector not specified")
-
             if (interest.getName().size() > 0 and
                 interest.getName().get(-1).isImplicitSha256Digest()):
                 logging.getLogger(__name__).error(

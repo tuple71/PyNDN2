@@ -26,7 +26,7 @@ elif sys.version_info[0] == 3:
 setup(
     name='PyNDN',
 
-    version='2.11b1',
+    version='2.11b1e',
 
     description='An NDN client library with TLV wire format support in native Python',
 
@@ -53,6 +53,9 @@ setup(
         'Programming Language :: Python :: 3.2',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
 
     keywords='NDN',

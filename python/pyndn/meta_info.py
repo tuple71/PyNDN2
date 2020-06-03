@@ -22,7 +22,7 @@ This module defines the MetaInfo class which is used by Data and represents
 the fields of an NDN MetaInfo.
 """
 
-from pyndn.name import Name
+# from pyndn.name import Name
 from pyndn.util.common import Common
 
 class MetaInfo(object):
@@ -44,6 +44,7 @@ class MetaInfo(object):
             self._otherTypeCode = value._otherTypeCode
             self._freshnessPeriod = value._freshnessPeriod
             self._finalBlockId = value._finalBlockId
+            self._appMetaInfo = value._appMetaInfo
         else:
             raise RuntimeError(
               "Unrecognized type for MetaInfo constructor: " +
@@ -94,6 +95,11 @@ class MetaInfo(object):
         :deprecated: Use getFinalBlockId.
         """
         return self.getFinalBlockId()
+    
+    def getAppMetaInfo(self):
+        """
+        """
+        return self._appMetaInfo
 
     def setType(self, type):
         """
@@ -144,6 +150,8 @@ class MetaInfo(object):
         :type finalBlockId: Name.Component or value for the Name.Component
           constructor
         """
+        from pyndn.name import Name
+        
         self._finalBlockId = (finalBlockId if isinstance(finalBlockId, Name.Component)
                               else Name.Component(finalBlockId))
         self._changeCount += 1
@@ -154,14 +162,34 @@ class MetaInfo(object):
         """
         self.setFinalBlockId(finalBlockId)
 
+    def setAppMetaInfo(self, appMetaInfo):
+        """
+        """
+        self._appMetaInfo = appMetaInfo if isinstance(appMetaInfo, list) else list([appMetaInfo])
+        self._changeCount += 1
+        
+    def addAppMetaInfo(self, appMetaInfo):
+        """
+        """
+        if appMetaInfo is None:
+            return
+        
+        if self._appMetaInfo is None:
+            self._appMetaInfo = []
+        self._appMetaInfo.extend(appMetaInfo if isinstance(appMetaInfo, list) else list([appMetaInfo]))
+        self._changeCount += 1
+        
     def clear(self):
         """
         Clear fields and reset to default values.
         """
+        from pyndn.name import Name
+        
         self._type = ContentType.BLOB
         self._otherTypeCode = -1
         self._freshnessPeriod = None
         self._finalBlockId = Name.Component()
+        self._appMetaInfo = None
 
         self._changeCount += 1
 
@@ -190,6 +218,8 @@ class MetaInfo(object):
     freshnessPeriod = property(getFreshnessPeriod, setFreshnessPeriod)
     finalBlockId = property(getFinalBlockId, setFinalBlockId)
     finalBlockID = property(getFinalBlockID, setFinalBlockID)
+    finalBlockID = property(getFinalBlockID, setFinalBlockID)
+    appMetaInfo = property(getAppMetaInfo, setAppMetaInfo)
 
 class ContentType(object):
     """

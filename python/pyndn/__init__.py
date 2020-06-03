@@ -20,13 +20,13 @@
 # A copy of the GNU Lesser General Public License is in the file COPYING.
 
 from pyndn import control_parameters, control_response, data, delegation_set
-from pyndn import digest_sha256_signature, exclude, face, forwarding_flags
+from pyndn import digest_sha256_signature, face, forwarding_flags
 from pyndn import generic_signature, hmac_with_sha256_signature, interest
 from pyndn import interest_filter, key_locator, link, meta_info, name, network_nack
 from pyndn import registration_options, sha256_with_ecdsa_signature, sha256_with_rsa_signature
 from pyndn import signature, validity_period
 __all__ = ['control_parameters', 'control_response', 'data', 'delegation_set',
-           'digest_sha256_signature', 'exclude', 'face', 'forwarding_flags',
+           'digest_sha256_signature', 'face', 'forwarding_flags',
            'generic_signature', 'hmac_with_sha256_signature', 'interest',
            'interest_filter', 'key_locator', 'link', 'meta_info', 'name', 'network_nack',
            'registration_options', 'sha256_with_ecdsa_signature', 'sha256_with_rsa_signature',
@@ -39,7 +39,6 @@ try:
     from pyndn.control_response import *
     from pyndn.data import *
     from pyndn.delegation_set import *
-    from pyndn.exclude import *
     from pyndn.face import *
     from pyndn.forwarding_flags import *
     from pyndn.generic_signature import *

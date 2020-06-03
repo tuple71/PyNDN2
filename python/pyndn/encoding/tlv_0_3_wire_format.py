@@ -51,12 +51,12 @@ except ImportError:
 _systemRandom = SystemRandom()
 
 """
-This module defines the Tlv0_2WireFormat class which extends WireFormat to
+This module defines the Tlv0_3WireFormat class which extends WireFormat to
 override its methods to implment encoding and decoding Interest, Data, etc.
-with the NDN-TLV wire format, version 0.2.
+with the NDN-TLV wire format, version 0.3.
 """
 
-class Tlv0_2WireFormat(WireFormat):
+class Tlv0_3WireFormat(WireFormat):
     _instance = None
 
     _didCanBePrefixWarning = False
@@ -114,11 +114,6 @@ class Tlv0_2WireFormat(WireFormat):
           for a signed interest).
         :rtype: (Blob, int, int)
         """
-        if not interest._didSetCanBePrefix and not self._didCanBePrefixWarning:
-            print(
-              "WARNING: The default CanBePrefix will change. See Interest.setDefaultCanBePrefix() for details.")
-            self._didCanBePrefixWarning = True
-
         if haveModule_pyndn:
             # Use the C bindings.
             result = _pyndn.Tlv0_1_1WireFormat_encodeInterest(interest)
@@ -127,7 +122,7 @@ class Tlv0_2WireFormat(WireFormat):
         if interest.hasApplicationParameters():
             # The application has specified a format v0.3 field. As we
             # transition to format v0.3, encode as format v0.3 even though the
-            # application default is Tlv0_2WireFormat.
+            # application default is Tlv0_3WireFormat.
             return self._encodeInterestV03(interest)
 
         encoder = TlvEncoder(256)
@@ -143,7 +138,7 @@ class Tlv0_2WireFormat(WireFormat):
                   "An Interest may not have a link object when encoding a forwarding hint")
 
             forwardingHintSaveLength = len(encoder)
-            Tlv0_2WireFormat._encodeDelegationSet(
+            Tlv0_3WireFormat._encodeDelegationSet(
               interest.getForwardingHint(), encoder)
             encoder.writeTypeAndLength(
               Tlv.ForwardingHint, len(encoder) - forwardingHintSaveLength)
@@ -229,7 +224,7 @@ class Tlv0_2WireFormat(WireFormat):
         except Exception as exceptionV02:
             try:
                 # Failed to decode as format v0.2. Try to decode as v0.3.
-                return Tlv0_2WireFormat._decodeInterestV03(interest, input, copy)
+                return Tlv0_3WireFormat._decodeInterestV03(interest, input, copy)
             except:
                 # Ignore the exception decoding as format v0.3 and raise the
                 # exception from trying to decode as format as format v0.2.
@@ -247,10 +242,7 @@ class Tlv0_2WireFormat(WireFormat):
             self._decodeSelectors(interest, decoder, copy)
         else:
             # Set selectors to none.
-            interest.setMinSuffixComponents(None)
-            interest.setMaxSuffixComponents(None)
             interest.getKeyLocator().clear()
-            interest.setChildSelector(None)
             interest.setMustBeFresh(False)
 
         # Require a Nonce, but don't force it to be 4 bytes.
@@ -262,7 +254,7 @@ class Tlv0_2WireFormat(WireFormat):
         if decoder.peekType(Tlv.ForwardingHint, endOffset):
             forwardingHintEndOffset = decoder.readNestedTlvsStart(
               Tlv.ForwardingHint)
-            Tlv0_2WireFormat._decodeDelegationSet(
+            Tlv0_3WireFormat._decodeDelegationSet(
               interest.getForwardingHint(), forwardingHintEndOffset, decoder,
               copy)
             decoder.finishNestedTlvs(forwardingHintEndOffset)
@@ -644,7 +636,7 @@ class Tlv0_2WireFormat(WireFormat):
         :rtype: Blob
         """
         encoder = TlvEncoder(256)
-        Tlv0_2WireFormat._encodeDelegationSet(delegationSet, encoder)
+        Tlv0_3WireFormat._encodeDelegationSet(delegationSet, encoder)
 
         return Blob(encoder.getOutput(), False)
 
@@ -666,7 +658,7 @@ class Tlv0_2WireFormat(WireFormat):
           If omitted, use True.
         """
         decoder = TlvDecoder(input)
-        Tlv0_2WireFormat._decodeDelegationSet(
+        Tlv0_3WireFormat._decodeDelegationSet(
           delegationSet, len(input), decoder, copy)
 
     def encodeEncryptedContent(self, encryptedContent):
@@ -689,7 +681,7 @@ class Tlv0_2WireFormat(WireFormat):
         # Assume the algorithmType value is the same as the TLV type.
         encoder.writeNonNegativeIntegerTlv(
           Tlv.Encrypt_EncryptionAlgorithm, encryptedContent.getAlgorithmType())
-        Tlv0_2WireFormat._encodeKeyLocator(
+        Tlv0_3WireFormat._encodeKeyLocator(
           Tlv.KeyLocator, encryptedContent.getKeyLocator(), encoder)
 
         encoder.writeTypeAndLength(
@@ -715,7 +707,7 @@ class Tlv0_2WireFormat(WireFormat):
         endOffset = decoder.readNestedTlvsStart(Tlv.Encrypt_EncryptedContent)
 
         encryptedContent.clear()
-        Tlv0_2WireFormat._decodeKeyLocator(
+        Tlv0_3WireFormat._decodeKeyLocator(
           Tlv.KeyLocator, encryptedContent.getKeyLocator(), decoder, copy)
         encryptedContent.setAlgorithmType(
           decoder.readNonNegativeIntegerTlv(Tlv.Encrypt_EncryptionAlgorithm))
@@ -743,7 +735,7 @@ class Tlv0_2WireFormat(WireFormat):
 
         # Encode backwards.
         if encryptedContent.getKeyLocator().getType() == KeyLocatorType.KEYNAME:
-            Tlv0_2WireFormat._encodeName(
+            Tlv0_3WireFormat._encodeName(
               encryptedContent.getKeyLocator().getKeyName(), encoder)
         encoder.writeOptionalBlobTlv(
           Tlv.Encrypt_EncryptedPayloadKey, encryptedContent.getPayloadKey().buf())
@@ -786,7 +778,7 @@ class Tlv0_2WireFormat(WireFormat):
            (Tlv.Encrypt_EncryptedPayloadKey, endOffset), copy))
 
         if decoder.peekType(Tlv.Name, endOffset):
-            Tlv0_2WireFormat._decodeName(
+            Tlv0_3WireFormat._decodeName(
               encryptedContent.getKeyLocator().getKeyName(), decoder, copy)
             encryptedContent.getKeyLocator().setType(KeyLocatorType.KEYNAME)
 
@@ -795,14 +787,14 @@ class Tlv0_2WireFormat(WireFormat):
     @classmethod
     def get(self):
         """
-        Get a singleton instance of a Tlv0_2WireFormat.  To always use the
+        Get a singleton instance of a Tlv0_3WireFormat.  To always use the
         preferred version NDN-TLV, you should use TlvWireFormat.get().
 
         :return: The singleton instance.
-        :rtype: Tlv0_2WireFormat
+        :rtype: Tlv0_3WireFormat
         """
         if self._instance == None:
-            self._instance = Tlv0_2WireFormat()
+            self._instance = Tlv0_3WireFormat()
         return self._instance
 
     @staticmethod
@@ -871,7 +863,7 @@ class Tlv0_2WireFormat(WireFormat):
 
         # Encode the components backwards.
         for i in range(len(name) - 1, -1, -1):
-            Tlv0_2WireFormat._encodeNameComponent(name[i], encoder)
+            Tlv0_3WireFormat._encodeNameComponent(name[i], encoder)
             if i == len(name) - 1:
                 signedPortionEndOffsetFromBack = len(encoder)
 
@@ -918,7 +910,7 @@ class Tlv0_2WireFormat(WireFormat):
 
         while decoder.getOffset() < endOffset:
             signedPortionEndOffset = decoder.getOffset()
-            name.append(Tlv0_2WireFormat._decodeNameComponent(decoder, copy))
+            name.append(Tlv0_3WireFormat._decodeNameComponent(decoder, copy))
 
         decoder.finishNestedTlvs(endOffset)
         return (signedPortionBeginOffset, signedPortionEndOffset)
@@ -934,15 +926,9 @@ class Tlv0_2WireFormat(WireFormat):
         # Encode backwards.
         if interest.getMustBeFresh():
             encoder.writeTypeAndLength(Tlv.MustBeFresh, 0)
-        encoder.writeOptionalNonNegativeIntegerTlv(
-          Tlv.ChildSelector, interest.getChildSelector())
         if interest.getKeyLocator().getType() != None:
-            Tlv0_2WireFormat._encodeKeyLocator(
+            Tlv0_3WireFormat._encodeKeyLocator(
               Tlv.PublisherPublicKeyLocator, interest.getKeyLocator(), encoder)
-        encoder.writeOptionalNonNegativeIntegerTlv(
-          Tlv.MaxSuffixComponents, interest.getMaxSuffixComponents())
-        encoder.writeOptionalNonNegativeIntegerTlv(
-          Tlv.MinSuffixComponents, interest.getMinSuffixComponents())
 
         # Only output the type and length if values were written.
         if len(encoder) != saveLength:
@@ -952,23 +938,13 @@ class Tlv0_2WireFormat(WireFormat):
     def _decodeSelectors(interest, decoder, copy):
         endOffset = decoder.readNestedTlvsStart(Tlv.Selectors)
 
-        interest.setMinSuffixComponents(
-          decoder.readOptionalNonNegativeIntegerTlv
-            (Tlv.MinSuffixComponents, endOffset))
-        interest.setMaxSuffixComponents(
-          decoder.readOptionalNonNegativeIntegerTlv
-            (Tlv.MaxSuffixComponents, endOffset))
-
         if decoder.peekType(Tlv.PublisherPublicKeyLocator, endOffset):
-            Tlv0_2WireFormat._decodeKeyLocator(
+            Tlv0_3WireFormat._decodeKeyLocator(
               Tlv.PublisherPublicKeyLocator, interest.getKeyLocator(), decoder,
               copy)
         else:
             interest.getKeyLocator().clear()
 
-        interest.setChildSelector(
-          decoder.readOptionalNonNegativeIntegerTlv
-            (Tlv.ChildSelector, endOffset))
         interest.setMustBeFresh(
           decoder.readBooleanTlv(Tlv.MustBeFresh, endOffset))
 
@@ -978,12 +954,19 @@ class Tlv0_2WireFormat(WireFormat):
     def _encodeMetaInfo(metaInfo, encoder):
         saveLength = len(encoder)
 
+        # Encode AppMetaInfo
+        appMetaInfo = metaInfo.getAppMetaInfo()
+        if appMetaInfo != None and len(appMetaInfo) > 0:
+            for el in appMetaInfo:
+                encoder.writeBlobTlv(el)
+            pass
+
         # Encode backwards.
         finalBlockIdBuf = metaInfo.getFinalBlockId().getValue().buf()
         if finalBlockIdBuf != None and len(finalBlockIdBuf) > 0:
             # FinalBlockId has an inner NameComponent.
             finalBlockIdSaveLength = len(encoder)
-            Tlv0_2WireFormat._encodeNameComponent(
+            Tlv0_3WireFormat._encodeNameComponent(
               metaInfo.getFinalBlockId(), encoder)
             encoder.writeTypeAndLength(
               Tlv.FinalBlockId, len(encoder) - finalBlockIdSaveLength)
@@ -1034,7 +1017,7 @@ class Tlv0_2WireFormat(WireFormat):
         if decoder.peekType(Tlv.FinalBlockId, endOffset):
             finalBlockIdEndOffset = decoder.readNestedTlvsStart(Tlv.FinalBlockId)
             metaInfo.setFinalBlockId(
-              Tlv0_2WireFormat._decodeNameComponent(decoder, copy))
+              Tlv0_3WireFormat._decodeNameComponent(decoder, copy))
             decoder.finishNestedTlvs(finalBlockIdEndOffset)
         else:
             metaInfo.setFinalBlockId(None)
@@ -1074,23 +1057,23 @@ class Tlv0_2WireFormat(WireFormat):
         if isinstance(signature, Sha256WithRsaSignature):
             # Encode backwards.
             if signature.getValidityPeriod().hasPeriod():
-                Tlv0_2WireFormat._encodeValidityPeriod(
+                Tlv0_3WireFormat._encodeValidityPeriod(
                   signature.getValidityPeriod(), encoder)
-            Tlv0_2WireFormat._encodeKeyLocator(
+            Tlv0_3WireFormat._encodeKeyLocator(
               Tlv.KeyLocator, signature.getKeyLocator(), encoder)
             encoder.writeNonNegativeIntegerTlv(
               Tlv.SignatureType, Tlv.SignatureType_SignatureSha256WithRsa)
         elif isinstance(signature, Sha256WithEcdsaSignature):
             # Encode backwards.
             if signature.getValidityPeriod().hasPeriod():
-                Tlv0_2WireFormat._encodeValidityPeriod(
+                Tlv0_3WireFormat._encodeValidityPeriod(
                   signature.getValidityPeriod(), encoder)
-            Tlv0_2WireFormat._encodeKeyLocator(
+            Tlv0_3WireFormat._encodeKeyLocator(
               Tlv.KeyLocator, signature.getKeyLocator(), encoder)
             encoder.writeNonNegativeIntegerTlv(
               Tlv.SignatureType, Tlv.SignatureType_SignatureSha256WithEcdsa)
         elif isinstance(signature, HmacWithSha256Signature):
-            Tlv0_2WireFormat._encodeKeyLocator(
+            Tlv0_3WireFormat._encodeKeyLocator(
               Tlv.KeyLocator, signature.getKeyLocator(), encoder)
             encoder.writeNonNegativeIntegerTlv(
               Tlv.SignatureType, Tlv.SignatureType_SignatureHmacWithSha256)
@@ -1114,24 +1097,24 @@ class Tlv0_2WireFormat(WireFormat):
             # Modify signatureHolder's signature object because if we create an object
             #   and set it, then signatureHolder will have to copy all the fields.
             signatureInfo = signatureHolder.getSignature()
-            Tlv0_2WireFormat._decodeKeyLocator(
+            Tlv0_3WireFormat._decodeKeyLocator(
               Tlv.KeyLocator, signatureInfo.getKeyLocator(),
               decoder, copy)
             if decoder.peekType(Tlv.ValidityPeriod_ValidityPeriod, endOffset):
-                Tlv0_2WireFormat._decodeValidityPeriod(
+                Tlv0_3WireFormat._decodeValidityPeriod(
                   signatureInfo.getValidityPeriod(), decoder)
         elif signatureType == Tlv.SignatureType_SignatureSha256WithEcdsa:
             signatureHolder.setSignature(Sha256WithEcdsaSignature())
             signatureInfo = signatureHolder.getSignature()
-            Tlv0_2WireFormat._decodeKeyLocator(
+            Tlv0_3WireFormat._decodeKeyLocator(
               Tlv.KeyLocator, signatureInfo.getKeyLocator(),
               decoder, copy)
             if decoder.peekType(Tlv.ValidityPeriod_ValidityPeriod, endOffset):
-                Tlv0_2WireFormat._decodeValidityPeriod(
+                Tlv0_3WireFormat._decodeValidityPeriod(
                   signatureInfo.getValidityPeriod(), decoder)
         elif signatureType == Tlv.SignatureType_SignatureHmacWithSha256:
             signatureHolder.setSignature(HmacWithSha256Signature())
-            Tlv0_2WireFormat._decodeKeyLocator(
+            Tlv0_3WireFormat._decodeKeyLocator(
               Tlv.KeyLocator, signatureHolder.getSignature().getKeyLocator(),
               decoder, copy)
         elif signatureType == Tlv.SignatureType_DigestSha256:
@@ -1155,7 +1138,7 @@ class Tlv0_2WireFormat(WireFormat):
         # Encode backwards.
         if keyLocator.getType() != None:
             if keyLocator.getType() == KeyLocatorType.KEYNAME:
-                Tlv0_2WireFormat._encodeName(keyLocator.getKeyName(), encoder)
+                Tlv0_3WireFormat._encodeName(keyLocator.getKeyName(), encoder)
             elif (keyLocator.getType() == KeyLocatorType.KEY_LOCATOR_DIGEST and
                   len(keyLocator.getKeyData()) > 0):
                 encoder.writeBlobTlv(Tlv.KeyLocatorDigest,
@@ -1179,7 +1162,7 @@ class Tlv0_2WireFormat(WireFormat):
         if decoder.peekType(Tlv.Name, endOffset):
             # KeyLocator is a Name.
             keyLocator.setType(KeyLocatorType.KEYNAME)
-            Tlv0_2WireFormat._decodeName(keyLocator.getKeyName(), decoder, copy)
+            Tlv0_3WireFormat._decodeName(keyLocator.getKeyName(), decoder, copy)
         elif decoder.peekType(Tlv.KeyLocatorDigest, endOffset):
             # KeyLocator is a KeyLocatorDigest.
             keyLocator.setType(KeyLocatorType.KEY_LOCATOR_DIGEST)
@@ -1196,9 +1179,9 @@ class Tlv0_2WireFormat(WireFormat):
 
         # Encode backwards.
         encoder.writeBlobTlv(Tlv.ValidityPeriod_NotAfter,
-          Blob(Tlv0_2WireFormat.toIsoString(validityPeriod.getNotAfter())).buf())
+          Blob(Tlv0_3WireFormat.toIsoString(validityPeriod.getNotAfter())).buf())
         encoder.writeBlobTlv(Tlv.ValidityPeriod_NotBefore,
-          Blob(Tlv0_2WireFormat.toIsoString(validityPeriod.getNotBefore())).buf())
+          Blob(Tlv0_3WireFormat.toIsoString(validityPeriod.getNotBefore())).buf())
 
         encoder.writeTypeAndLength(
           Tlv.ValidityPeriod_ValidityPeriod, len(encoder) - saveLength)
@@ -1213,10 +1196,10 @@ class Tlv0_2WireFormat(WireFormat):
         # Set copy false since we just immediately get the string.
         isoString = Blob(
           decoder.readBlobTlv(Tlv.ValidityPeriod_NotBefore), False)
-        notBefore = Tlv0_2WireFormat.fromIsoString(str(isoString))
+        notBefore = Tlv0_3WireFormat.fromIsoString(str(isoString))
         isoString = Blob(
           decoder.readBlobTlv(Tlv.ValidityPeriod_NotAfter), False)
-        notAfter = Tlv0_2WireFormat.fromIsoString(str(isoString))
+        notAfter = Tlv0_3WireFormat.fromIsoString(str(isoString))
 
         validityPeriod.setPeriod(notBefore, notAfter)
 
@@ -1233,7 +1216,7 @@ class Tlv0_2WireFormat(WireFormat):
 
         if controlParameters.getStrategy().size() > 0:
             strategySaveLength = len(encoder)
-            Tlv0_2WireFormat._encodeName(controlParameters.getStrategy(), encoder)
+            Tlv0_3WireFormat._encodeName(controlParameters.getStrategy(), encoder)
             encoder.writeTypeAndLength(
               Tlv.ControlParameters_Strategy,
               len(encoder) - strategySaveLength)
@@ -1259,7 +1242,7 @@ class Tlv0_2WireFormat(WireFormat):
         encoder.writeOptionalNonNegativeIntegerTlv(
           Tlv.ControlParameters_FaceId, controlParameters.getFaceId())
         if controlParameters.getName() != None:
-          Tlv0_2WireFormat._encodeName(controlParameters.getName(), encoder)
+          Tlv0_3WireFormat._encodeName(controlParameters.getName(), encoder)
 
         encoder.writeTypeAndLength(Tlv.ControlParameters_ControlParameters,
                                    len(encoder) - saveLength)
@@ -1274,7 +1257,7 @@ class Tlv0_2WireFormat(WireFormat):
         # decode name
         if decoder.peekType(Tlv.Name, endOffset):
             name = Name()
-            Tlv0_2WireFormat._decodeName(name, decoder, copy)
+            Tlv0_3WireFormat._decodeName(name, decoder, copy)
             controlParameters.setName(name)
 
         # decode face ID
@@ -1323,7 +1306,7 @@ class Tlv0_2WireFormat(WireFormat):
         if decoder.peekType(Tlv.ControlParameters_Strategy, endOffset):
             strategyEndOffset = decoder.readNestedTlvsStart(
               Tlv.ControlParameters_Strategy)
-            Tlv0_2WireFormat._decodeName(
+            Tlv0_3WireFormat._decodeName(
               controlParameters.getStrategy(), decoder, copy)
             decoder.finishNestedTlvs(strategyEndOffset)
 
@@ -1349,7 +1332,7 @@ class Tlv0_2WireFormat(WireFormat):
         for i in range(delegationSet.size() - 1, -1, -1):
             saveLength = len(encoder)
 
-            Tlv0_2WireFormat._encodeName(delegationSet.get(i).getName(), encoder)
+            Tlv0_3WireFormat._encodeName(delegationSet.get(i).getName(), encoder)
             encoder.writeNonNegativeIntegerTlv(
               Tlv.Link_Preference, delegationSet.get(i).getPreference())
 
@@ -1378,7 +1361,7 @@ class Tlv0_2WireFormat(WireFormat):
             decoder.readTypeAndLength(Tlv.Link_Delegation)
             preference = decoder.readNonNegativeIntegerTlv(Tlv.Link_Preference)
             name = Name()
-            Tlv0_2WireFormat._decodeName(name, decoder, copy)
+            Tlv0_3WireFormat._decodeName(name, decoder, copy)
 
             # Add unsorted to preserve the order so that Interest selected
             # delegation index will work.
@@ -1408,7 +1391,9 @@ class Tlv0_2WireFormat(WireFormat):
         # Encode backwards.
         encoder.writeOptionalBlobTlv(
           Tlv.ApplicationParameters, interest.getApplicationParameters().buf())
-        # TODO: HopLimit.
+        # add HopLimit.
+        encoder.writeOptionalNonNegativeIntegerTlv(Tlv.HopLimit, interest.getHopLimit())
+        
         encoder.writeOptionalNonNegativeIntegerTlvFromFloat(
           Tlv.InterestLifetime, interest.getInterestLifetimeMilliseconds())
 
@@ -1445,7 +1430,7 @@ class Tlv0_2WireFormat(WireFormat):
                   "An Interest may not have a link object when encoding a forwarding hint")
 
             forwardingHintSaveLength = len(encoder)
-            Tlv0_2WireFormat._encodeDelegationSet(
+            Tlv0_3WireFormat._encodeDelegationSet(
               interest.getForwardingHint(), encoder)
             encoder.writeTypeAndLength(
               Tlv.ForwardingHint, len(encoder) - forwardingHintSaveLength)
@@ -1456,7 +1441,7 @@ class Tlv0_2WireFormat(WireFormat):
             encoder.writeTypeAndLength(Tlv.CanBePrefix, 0)
 
         (tempSignedPortionBeginOffset, tempSignedPortionEndOffset) = \
-          Tlv0_2WireFormat._encodeName(interest.getName(), encoder)
+          Tlv0_3WireFormat._encodeName(interest.getName(), encoder)
         signedPortionBeginOffsetFromBack = (len(encoder) -
                                             tempSignedPortionBeginOffset)
         signedPortionEndOffsetFromBack = (len(encoder) -
@@ -1497,7 +1482,7 @@ class Tlv0_2WireFormat(WireFormat):
         decoder = TlvDecoder(input)
 
         endOffset = decoder.readNestedTlvsStart(Tlv.Interest)
-        offsets = Tlv0_2WireFormat._decodeName(interest.getName(), decoder, copy)
+        offsets = Tlv0_3WireFormat._decodeName(interest.getName(), decoder, copy)
 
         # In v0.2 semantics, this calls setMaxSuffixComponents.
         interest.setCanBePrefix(
@@ -1509,7 +1494,7 @@ class Tlv0_2WireFormat(WireFormat):
         if decoder.peekType(Tlv.ForwardingHint, endOffset):
             forwardingHintEndOffset = decoder.readNestedTlvsStart(
               Tlv.ForwardingHint)
-            Tlv0_2WireFormat._decodeDelegationSet(
+            Tlv0_3WireFormat._decodeDelegationSet(
               interest.getForwardingHint(), forwardingHintEndOffset, decoder,
               copy)
             decoder.finishNestedTlvs(forwardingHintEndOffset)
@@ -1522,9 +1507,7 @@ class Tlv0_2WireFormat(WireFormat):
            (Tlv.InterestLifetime, endOffset))
 
         # Clear the unused fields.
-        interest.setMinSuffixComponents(None)
         interest.getKeyLocator().clear()
-        interest.setChildSelector(None)
         interest.unsetLink()
         interest.setSelectedDelegationIndex(None)
 
@@ -1574,6 +1557,6 @@ class Tlv0_2WireFormat(WireFormat):
           int(timeString[9:11]),
           int(timeString[11:13]),
           int(timeString[13:15]))
-        return (utc - Tlv0_2WireFormat._posixEpoch).total_seconds() * 1000.0
+        return (utc - Tlv0_3WireFormat._posixEpoch).total_seconds() * 1000.0
 
     _posixEpoch = datetime.utcfromtimestamp(0)

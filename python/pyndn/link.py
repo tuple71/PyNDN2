@@ -24,7 +24,7 @@ where the Data content is an encoded delegation set. The format is defined in
 """
 
 from pyndn.data import Data
-from pyndn.meta_info import ContentType
+# from pyndn.meta_info import ContentType
 from pyndn.delegation_set import DelegationSet
 from pyndn.encoding.wire_format import WireFormat
 
@@ -42,6 +42,8 @@ class Link(Data):
           can be decoded using the default wire encoding, then update the list
           of delegations.
         """
+        from pyndn.meta_info import ContentType
+        
         self._delegations = DelegationSet()
 
         if isinstance(value, Data):
@@ -68,6 +70,8 @@ class Link(Data):
            DelegationSet. If omitted, use WireFormat.getDefaultWireFormat().
         :type wireFormat: A subclass of WireFormat
         """
+        from pyndn.meta_info import ContentType
+        
         if wireFormat == None:
             # Don't use a default argument since getDefaultWireFormat can change.
             wireFormat = WireFormat.getDefaultWireFormat()
@@ -145,5 +149,7 @@ class Link(Data):
         :param WireFormat wireFormat: A WireFormat object used to encode the
           DelegationSet.
         """
+        from pyndn.meta_info import ContentType
+        
         self.setContent(self._delegations.wireEncode(wireFormat))
         self.getMetaInfo().setType(ContentType.LINK)

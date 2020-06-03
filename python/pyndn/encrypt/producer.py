@@ -28,11 +28,9 @@ Note: This class is an experimental feature. The API may change.
 import logging
 import math
 from pyndn.name import Name
-from pyndn.exclude import Exclude
 from pyndn.interest import Interest
 from pyndn.data import Data
 from pyndn.link import Link
-from pyndn.exclude import Exclude
 from pyndn.network_nack import NetworkNack
 from pyndn.security.key_params import AesKeyParams
 from pyndn.encrypt.schedule import Schedule
@@ -160,10 +158,6 @@ class Producer(object):
         self._keyRequests[timeCount] = Producer._KeyRequest(len(self._eKeyInfo))
         keyRequest = self._keyRequests[timeCount]
 
-        # Check if the current E-KEYs can cover the content key.
-        timeRange = Exclude()
-        Producer.excludeAfter(
-          timeRange, Name.Component(Schedule.toIsoString(timeSlot)))
         # Send interests for all nodes in the tree.
         for keyName in self._eKeyInfo:
             # For each current E-KEY.
@@ -173,8 +167,7 @@ class Producer(object):
                 # The current E-KEY cannot cover the content key, so retrieve one.
                 keyRequest.repeatAttempts[keyName] = 0
                 self._sendKeyInterest(
-                  Interest(keyName).setExclude(timeRange).setChildSelector(1),
-                  timeSlot, onEncryptedKeys, onError)
+                  Interest(keyName), timeSlot, onEncryptedKeys, onError)
             else:
                 # The current E-KEY can cover the content key.
                 # Encrypt the content key directly.
@@ -383,12 +376,9 @@ class Producer(object):
         if timeSlot >= end:
             # If the received E-KEY covers some earlier period, try to retrieve
             # an E-KEY covering a later one.
-            timeRange = Exclude(interest.getExclude())
-            Producer.excludeBefore(timeRange, keyName.get(Producer.START_TIME_STAMP_INDEX))
             keyRequest.repeatAttempts[interestName] = 0
             self._sendKeyInterest(
-              Interest(interestName).setExclude(timeRange).setChildSelector(1),
-              timeSlot, onEncryptedKeys, onError)
+              Interest(interestName), timeSlot, onEncryptedKeys, onError)
         else:
             # If the received E-KEY covers the content key, encrypt the content.
             encryptionKey = data.getContent()
@@ -447,208 +437,6 @@ class Producer(object):
         keyRequest.encryptedKeys.append(cKeyData)
         self._updateKeyRequest(keyRequest, timeCount, onEncryptedKeys)
         return True
-
-    # TODO: Move this to be the main representation inside the Exclude object.
-    class ExcludeEntry(object):
-        """
-        Create a new ExcludeEntry.
-
-        :param Name.Component component:
-        :param bool anyFollowsComponent:
-        """
-        def __init__(self, component, anyFollowsComponent):
-            self._component = component
-            self._anyFollowsComponent = anyFollowsComponent
-
-    @staticmethod
-    def getExcludeEntries(exclude):
-        """
-        Create a list of ExcludeEntry from the Exclude object.
-
-        :param Exclude exclude: The Exclude object to read.
-        :return: A new array of ExcludeEntry.
-        :rtype: Array<ExcludeEntry>
-        """
-        entries = []
-
-        for i in range(exclude.size()):
-            if exclude.get(i).getType() == Exclude.ANY:
-                if len(entries) == 0:
-                    # Add a "beginning ANY".
-                    entries.append(Producer.ExcludeEntry(Name.Component(), True))
-                else:
-                    # Set anyFollowsComponent of the final component.
-                    entries[len(entries) - 1]._anyFollowsComponent = True
-            else:
-                entries.append(
-                  Producer.ExcludeEntry(exclude.get(i).getComponent(), False))
-
-        return entries
-
-    @staticmethod
-    def setExcludeEntries(exclude, entries):
-        """
-        Set the Exclude object from the array of ExcludeEntry.
-
-        :param Exclude exclude: The Exclude object to update.
-        :param Array<ExcludeEntry> entries: The array of ExcludeEntry.
-        """
-        exclude.clear()
-
-        for i in range(len(entries)):
-            entry = entries[i]
-
-            if (i == 0 and entry._component.getValue().size() == 0 and
-                  entry._anyFollowsComponent):
-                # This is a "beginning ANY".
-                exclude.appendAny()
-            else:
-                exclude.appendComponent(entry._component)
-                if entry._anyFollowsComponent:
-                    exclude.appendAny()
-
-    @staticmethod
-    def findEntryBeforeOrAt(entries, component):
-        """
-        Get the latest entry in the array whose component is less than or equal
-        to component.
-
-        :param Array<ExcludeEntry> entries: The array of ExcludeEntry.
-        :param Name.Component component: The component to compare.
-        :return: The index of the found entry, or -1 if not found.
-        :rtype: int
-        """
-        i = len(entries) - 1
-        while i >= 0:
-            if entries[i]._component.compare(component) <= 0:
-                break
-            i -= 1
-
-        return i
-
-    @staticmethod
-    def excludeAfter(exclude, fromComponent):
-        """
-        Exclude all components in the range beginning at "fromComponent".
-
-        :param Exclude exclude: The Exclude object to update.
-        :param Name.Component fromComponent: The first component in the exclude
-          range.
-        """
-        entries = Producer.getExcludeEntries(exclude)
-
-        iFoundFrom = Producer.findEntryBeforeOrAt(entries, fromComponent)
-        if iFoundFrom < 0:
-            # There is no entry before "fromComponent" so insert at the beginning.
-            entries.insert(0, Producer.ExcludeEntry(fromComponent, True))
-            iNewFrom = 0
-        else:
-            foundFrom = entries[iFoundFrom]
-
-            if not foundFrom._anyFollowsComponent:
-                if foundFrom._component.equals(fromComponent):
-                    # There is already an entry with "fromComponent", so just
-                    #   set the "ANY" flag.
-                    foundFrom._anyFollowsComponent = True
-                    iNewFrom = iFoundFrom
-                else:
-                    # Insert following the entry before "fromComponent".
-                    entries.insert(iFoundFrom + 1,
-                      Producer.ExcludeEntry(fromComponent, True))
-                    iNewFrom = iFoundFrom + 1
-            else:
-                # The entry before "fromComponent" already has an "ANY" flag,
-                #   so do nothing.
-                iNewFrom = iFoundFrom
-
-        # Remove intermediate entries since they are inside the range.
-        iRemoveBegin = iNewFrom + 1
-        entries[iRemoveBegin:] = []
-
-        Producer.setExcludeEntries(exclude, entries)
-
-    @staticmethod
-    def excludeBefore(exclude, to):
-        """
-        Exclude all components in the range ending at "to".
-
-        :param Exclude exclude: The Exclude object to update.
-        :param Name.Component to: The last component in the exclude range.
-        """
-        Producer.excludeRange(exclude, Name.Component(), to)
-
-    @staticmethod
-    def excludeRange(exclude, fromComponent, to):
-        """
-        Exclude all components in the range beginning at "fromComponent" and
-        ending at "to".
-
-        :param Exclude exclude: The Exclude object to update.
-        :param Name.Component fromComponent: The first component in the exclude
-          range.
-        :param Name.Component to: The last component in the exclude range.
-        """
-        if fromComponent.compare(to) >= 0:
-            if fromComponent.compare(to) == 0:
-                raise RuntimeError(
-                  "excludeRange: from == to. To exclude a single component, sue excludeOne.")
-            else:
-                raise RuntimeError(
-                  "excludeRange: from must be less than to. Invalid range: [" +
-                  fromComponent.toEscapedString() + ", " + to.toEscapedString() + "]")
-
-        entries = Producer.getExcludeEntries(exclude)
-
-        iFoundFrom = Producer.findEntryBeforeOrAt(entries, fromComponent)
-        if iFoundFrom < 0:
-            # There is no entry before "fromComponent" so insert at the beginning.
-            entries.insert(0, Producer.ExcludeEntry(fromComponent, True))
-            iNewFrom = 0
-        else:
-            foundFrom = entries[iFoundFrom]
-
-            if not foundFrom._anyFollowsComponent:
-                if foundFrom._component.equals(fromComponent):
-                    # There is already an entry with "fromComponent", so just
-                    #   set the "ANY" flag.
-                    foundFrom._anyFollowsComponent = True
-                    iNewFrom = iFoundFrom
-                else:
-                    # Insert following the entry before "fromComponent".
-                    entries.insert(iFoundFrom + 1,
-                      Producer.ExcludeEntry(fromComponent, True))
-                    iNewFrom = iFoundFrom + 1
-            else:
-                # The entry before "fromComponent" already has an "ANY" flag,
-                #   so do nothing.
-                iNewFrom = iFoundFrom
-
-        # We have at least one "fromComponent" before "to", so we know this will
-        #   find an entry.
-        iFoundTo = Producer.findEntryBeforeOrAt(entries, to)
-        foundTo = entries[iFoundTo]
-        if iFoundTo == iNewFrom:
-            # Insert the "to" immediately after the "fromComponent".
-            entries.insert(iNewFrom + 1, Producer.ExcludeEntry(to, False))
-        else:
-            if not foundTo._anyFollowsComponent:
-                if foundTo._component.equals(to):
-                    # The "to" entry already exists. Remove up to it.
-                    iRemoveEnd = iFoundTo
-                else:
-                    # Insert following the previous entry, which will be removed.
-                    entries.insert(iFoundTo + 1, Producer.ExcludeEntry(to, False))
-                    iRemoveEnd = iFoundTo + 1
-            else:
-                # "to" follows a component which is already followed by "ANY",
-                #   meaning the new range now encompasses it, so remove the component.
-                iRemoveEnd = iFoundTo + 1
-
-            # Remove intermediate entries since they are inside the range.
-            iRemoveBegin = iNewFrom + 1
-            entries[iRemoveBegin:iRemoveEnd] = []
-
-        Producer.setExcludeEntries(exclude, entries)
 
     START_TIME_STAMP_INDEX = -2
     END_TIME_STAMP_INDEX = -1

@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # A copy of the GNU Lesser General Public License is in the file COPYING.
+# from pyndn.security.policy import self_verify_policy_manager
 
 """
 This module defines the NDN Interest class.
@@ -31,7 +32,6 @@ from pyndn.util.signed_blob import SignedBlob
 from pyndn.util.change_counter import ChangeCounter
 from pyndn.name import Name
 from pyndn.key_locator import KeyLocator
-from pyndn.exclude import Exclude
 from pyndn.link import Link
 from pyndn.delegation_set import DelegationSet
 from pyndn.lp.incoming_face_id import IncomingFaceId
@@ -41,12 +41,9 @@ class Interest(object):
         if isinstance(value, Interest):
             # Copy the values.
             self._name = ChangeCounter(Name(value.getName()))
-            self._minSuffixComponents = value._minSuffixComponents
-            self._maxSuffixComponents = value._maxSuffixComponents
-            self._didSetCanBePrefix = value._didSetCanBePrefix
+            self._canBePrefix = value._canBePrefix
+            self._hopLimit = value._hopLimit
             self._keyLocator = ChangeCounter(KeyLocator(value.getKeyLocator()))
-            self._exclude = ChangeCounter(Exclude(value.getExclude()))
-            self._childSelector = value._childSelector
             self._mustBeFresh = value._mustBeFresh
 
             self._nonce = value.getNonce()
@@ -63,13 +60,9 @@ class Interest(object):
             self._defaultWireEncodingFormat = value._defaultWireEncodingFormat
         else:
             self._name = ChangeCounter(Name(value))
-            self._minSuffixComponents = None
-            self._maxSuffixComponents = None if Interest._defaultCanBePrefix else 1
-            # _didSetCanBePrefix is True if the app already called setDefaultCanBePrefix().
-            self._didSetCanBePrefix = Interest._didSetDefaultCanBePrefix
+            self._canBePrefix = Interest._defaultCanBePrefix
+            self._hopLimit = Interest._defaultHopLimit
             self._keyLocator = ChangeCounter(KeyLocator())
-            self._exclude = ChangeCounter(Exclude())
-            self._childSelector = None
             self._mustBeFresh = False
 
             self._nonce = Blob()
@@ -114,7 +107,6 @@ class Interest(object):
         :param bool defaultCanBePrefix: The default value of the CanBePrefix flag.
         """
         Interest._defaultCanBePrefix = defaultCanBePrefix
-        Interest._didSetDefaultCanBePrefix = True
 
     def getName(self):
         """
@@ -124,24 +116,6 @@ class Interest(object):
         :rtype: Name
         """
         return self._name.get()
-
-    def getMinSuffixComponents(self):
-        """
-        Get the min suffix components.
-
-        :return: The min suffix components, or None if not specified.
-        :rtype: int
-        """
-        return self._minSuffixComponents
-
-    def getMaxSuffixComponents(self):
-        """
-        Get the max suffix components.
-
-        :return: The max suffix components, or None if not specified.
-        :rtype: int
-        """
-        return self._maxSuffixComponents
 
     def getCanBePrefix(self):
         """
@@ -153,8 +127,18 @@ class Interest(object):
         """
         # Use the closest v0.2 semantics. CanBePrefix is the opposite of exact
         # match where MaxSuffixComponents is 1 (for the implicit digest).
-        return self._maxSuffixComponents != 1
+        return self._canBePrefix
+    
+    def getHopLimit(self):
+        """
+        Get the Hop Limit. if not specified, the default is 200
+        
+        :return The Hop Limit
+        :rtype: int
+        """
+        return self._hopLimit
 
+    
     def getKeyLocator(self):
         """
         Get the interest key locator.
@@ -164,25 +148,6 @@ class Interest(object):
         :rtype: KeyLocator
         """
         return self._keyLocator.get()
-
-    def getExclude(self):
-        """
-        Get the exclude object.
-
-        :return: The exclude object. If the exclude size() is zero, then
-          the exclude is not specified.
-        :rtype: Exclude
-        """
-        return self._exclude.get()
-
-    def getChildSelector(self):
-        """
-        Get the child selector.
-
-        :return: The child selector, or None if not specified.
-        :rtype: int
-        """
-        return self._childSelector
 
     def getMustBeFresh(self):
         """
@@ -357,32 +322,6 @@ class Interest(object):
         self._changeCount += 1
         return self
 
-    def setMinSuffixComponents(self, minSuffixComponents):
-        """
-        Set the min suffix components count.
-
-        :param int minSuffixComponents: The min suffix components count. If not
-          specified, set to None.
-        :return: This Interest so that you can chain calls to update values.
-        :rtype: Interest
-        """
-        self._minSuffixComponents = Common.nonNegativeIntOrNone(minSuffixComponents)
-        self._changeCount += 1
-        return self
-
-    def setMaxSuffixComponents(self, maxSuffixComponents):
-        """
-        Set the max suffix components count.
-
-        :param int maxSuffixComponents: The max suffix components count. If not
-          specified, set to None.
-        :return: This Interest so that you can chain calls to update values.
-        :rtype: Interest
-        """
-        self._maxSuffixComponents = Common.nonNegativeIntOrNone(maxSuffixComponents)
-        self._changeCount += 1
-        return self
-
     def setCanBePrefix(self, canBePrefix):
         """
         Set the CanBePrefix flag.
@@ -393,8 +332,19 @@ class Interest(object):
         """
         # Use the closest v0.2 semantics. CanBePrefix is the opposite of exact
         # match where MaxSuffixComponents is 1 (for the implicit digest).
-        self._maxSuffixComponents = None if canBePrefix else 1
-        self._didSetCanBePrefix = True
+        self._canBePrefix = canBePrefix
+        self._changeCount += 1
+        return self
+
+    def setHopLimit(self, hopLimit):
+        """
+        Set the Hop Limit
+        
+        :param: int hopLimit
+        :return: This Interest so that you can chain calls to update values.
+        :rtype: Interest
+        """
+        self._hopLimit = hopLimit
         self._changeCount += 1
         return self
 
@@ -412,22 +362,6 @@ class Interest(object):
         self._keyLocator.set(
           KeyLocator(keyLocator) if isinstance(keyLocator, KeyLocator)
                      else KeyLocator())
-        self._changeCount += 1
-        return self
-
-    def setExclude(self, exclude):
-        """
-        Set this interest to use a copy of the given Exclude object.
-
-        :note: You can also call getExclude and change the exclude entries directly.
-        :param Exclude exclude: The Exclude object. This makes a copy of the
-          object. If no exclude is specified, set to a new default Exclude(), or
-          to an Exclude with size() 0.
-        :return: This Interest so that you can chain calls to update values.
-        :rtype: Interest
-        """
-        self._exclude.set(
-          Exclude(exclude) if isinstance(exclude, Exclude) else Exclude())
         self._changeCount += 1
         return self
 
@@ -525,18 +459,6 @@ class Interest(object):
         :deprecated: Use setForwardingHint.
         """
         self._selectedDelegationIndex = Common.nonNegativeIntOrNone(selectedDelegationIndex)
-        self._changeCount += 1
-        return self
-
-    def setChildSelector(self, childSelector):
-        """
-        Set the child selector.
-
-        :param int childSelector: The child selector. If not specified, set to None.
-        :return: This Interest so that you can chain calls to update values.
-        :rtype: Interest
-        """
-        self._childSelector = Common.nonNegativeIntOrNone(childSelector)
         self._changeCount += 1
         return self
 
@@ -679,14 +601,6 @@ class Interest(object):
         :rtype: str
         """
         selectors = ""
-        if self._minSuffixComponents != None:
-            selectors += "&ndn.MinSuffixComponents=" + repr(
-              self._minSuffixComponents)
-        if self._maxSuffixComponents != None:
-            selectors += "&ndn.MaxSuffixComponents=" + repr(
-              self._maxSuffixComponents)
-        if self._childSelector != None:
-            selectors += "&ndn.ChildSelector=" + repr(self._childSelector)
         if self._mustBeFresh:
             selectors += "&ndn.MustBeFresh=true"
         if self._interestLifetimeMilliseconds != None:
@@ -695,8 +609,6 @@ class Interest(object):
         if self.getNonce().size() > 0:
             selectors += ("&ndn.Nonce=" +
               Name.toEscapedString(self.getNonce().buf()))
-        if self.getExclude().size() > 0:
-            selectors += "&ndn.Exclude=" + self.getExclude().toUri()
 
         result = self.getName().toUri()
         if selectors != "":
@@ -741,21 +653,6 @@ class Interest(object):
         if not self.getName().match(name):
             return False
 
-        if (self._minSuffixComponents != None and
-              # Add 1 for the implicit digest.
-              not (name.size() + 1 - self.getName().size() >=
-                   self._minSuffixComponents)):
-            return False
-        if (self._maxSuffixComponents != None and
-              # Add 1 for the implicit digest.
-              not (name.size() + 1 - self.getName().size() <=
-                   self._maxSuffixComponents)):
-            return False
-        if (self.getExclude().size() > 0 and
-              name.size() > self.getName().size() and
-              self.getExclude().matches(name[self.getName().size()])):
-            return False
-
         return True
 
     def matchesData(self, data, wireFormat = None):
@@ -779,19 +676,6 @@ class Interest(object):
         dataName = data.getName()
         fullNameLength = dataName.size() + 1
 
-        # Check MinSuffixComponents.
-        hasMinSuffixComponents = (self.getMinSuffixComponents() != None)
-        minSuffixComponents = (self.getMinSuffixComponents() if
-          hasMinSuffixComponents else 0)
-        if not (interestNameLength + minSuffixComponents <= fullNameLength):
-            return False
-
-        # Check MaxSuffixComponents.
-        hasMaxSuffixComponents = (self.getMaxSuffixComponents() != None)
-        if (hasMaxSuffixComponents and
-             not (interestNameLength + self.getMaxSuffixComponents() >= fullNameLength)):
-            return False
-
         # Check the prefix.
         if interestNameLength == fullNameLength:
             if self.getName().get(-1).isImplicitSha256Digest():
@@ -804,33 +688,16 @@ class Interest(object):
                 return False
         else:
             # The Interest Name should be a strict prefix of the Data full Name.
-            if not self.getName().isPrefixOf(dataName):
+            if self.getCanBePrefix():
+                if not self.getName().isPrefixOf(dataName) :
+                    return False
+            elif self.getName() != dataName :
                 return False
 
-        # Check the Exclude.
-        # The Exclude won't be violated if the Interest Name is the same as the
-        #   Data full Name.
-        if self.getExclude().size() > 0 and fullNameLength > interestNameLength:
-            if interestNameLength == fullNameLength - 1:
-                # The component to exclude is the digest.
-                if self.getExclude().matches(
-                     data.getFullName(wireFormat).get(interestNameLength)):
-                    return False
-            else:
-                # The component to exclude is not the digest.
-                if self.getExclude().matches(dataName.get(interestNameLength)):
-                    return False
 
-        # Check the KeyLocator.
-        publisherPublicKeyLocator = self.getKeyLocator()
-        if publisherPublicKeyLocator.getType() != None:
-            signature = data.getSignature()
-            if not KeyLocator.canGetFromSignature(signature):
-                # No KeyLocator in the Data packet.
-                return False
-            if not publisherPublicKeyLocator.equals(
-                  (KeyLocator.getFromSignature(signature))):
-                return False
+        # check MustBeFresh
+        if self.getMustBeFresh() and (data.getFreshnessPeriod() is None or data.getFreshnessPeriod() <= 0):
+            return False;
 
         return True
 
@@ -887,7 +754,6 @@ class Interest(object):
         # Make sure each of the checkChanged is called.
         changed = self._name.checkChanged()
         changed = self._keyLocator.checkChanged() or changed
-        changed = self._exclude.checkChanged() or changed
         changed = self._forwardingHint.checkChanged() or changed
         if changed:
             # A child object has changed, so update the change count.
@@ -906,16 +772,14 @@ class Interest(object):
     _systemRandom = SystemRandom()
 
     _defaultCanBePrefix = True
-    _didSetDefaultCanBePrefix = False
-
+    
+    _defaultHopLimit = 200
+    
     # Create managed properties for read/write properties of the class for more pythonic syntax.
     name = property(getName, setName)
-    minSuffixComponents = property(getMinSuffixComponents, setMinSuffixComponents)
-    maxSuffixComponents = property(getMaxSuffixComponents, setMaxSuffixComponents)
     canBePrefix = property(getCanBePrefix, setCanBePrefix)
+    hopLimit = property(getHopLimit, setHopLimit)
     keyLocator = property(getKeyLocator, setKeyLocator)
-    exclude = property(getExclude, setExclude)
-    childSelector = property(getChildSelector, setChildSelector)
     mustBeFresh = property(getMustBeFresh, setMustBeFresh)
     nonce = property(getNonce, setNonce)
     interestLifetimeMilliseconds = property(getInterestLifetimeMilliseconds, setInterestLifetimeMilliseconds)

@@ -137,16 +137,16 @@ class MemoryContentCache(object):
         # WireFormat,          None,                None,                None
         # None,                None,                None,                None
         if type(arg3) is list and len(arg3) == 1:
-          onRegisterSuccess = arg3[0]
+            onRegisterSuccess = arg3[0]
         else:
-          onRegisterSuccess = None
+            onRegisterSuccess = None
 
         if isinstance(arg3, collections.Callable):
-          onDataNotFound = arg3
+            onDataNotFound = arg3
         elif isinstance(arg4, collections.Callable):
-          onDataNotFound = arg4
+            onDataNotFound = arg4
         else:
-          onDataNotFound = None
+            onDataNotFound = None
 
         if isinstance(arg3, RegistrationOptions):
             registrationOptions = arg3
@@ -390,36 +390,24 @@ class MemoryContentCache(object):
 
             if (interest.matchesName(content.getName()) and
                   not (interest.getMustBeFresh() and not isFresh)):
-                if (interest.getChildSelector() == None):
-                    # No child selector, so send the first match that we have found.
-                    logging.getLogger(__name__).info(
-                      "MemoryContentCache:         Reply Data " + content.getName().toUri())
-                    face.send(content.getDataEncoding())
-                    return
+                # Update selectedEncoding based on the child selector.
+                if (content.getName().size() > interest.getName().size()):
+                    component = content.getName().get(interest.getName().size())
                 else:
-                    # Update selectedEncoding based on the child selector.
-                    if (content.getName().size() > interest.getName().size()):
-                        component = content.getName().get(interest.getName().size())
-                    else:
-                        component = self._emptyComponent
+                    component = self._emptyComponent
 
-                    gotBetterMatch = False
-                    if selectedEncoding == None:
-                        # Save the first match.
+                gotBetterMatch = False
+                if selectedEncoding == None:
+                    # Save the first match.
+                    gotBetterMatch = True
+                else:
+                    # Rightmost child.
+                    if component.compare(selectedComponent) > 0:
                         gotBetterMatch = True
-                    else:
-                        if interest.getChildSelector() == 0:
-                            # Leftmost child.
-                            if component.compare(selectedComponent) < 0:
-                                gotBetterMatch = True
-                        else:
-                            # Rightmost child.
-                            if component.compare(selectedComponent) > 0:
-                                gotBetterMatch = True
 
-                    if gotBetterMatch:
-                        selectedComponent = component
-                        selectedEncoding = content.getDataEncoding()
+                if gotBetterMatch:
+                    selectedComponent = component
+                    selectedEncoding = content.getDataEncoding()
 
         if selectedEncoding != None:
             # We found the leftmost or rightmost child.

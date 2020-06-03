@@ -28,13 +28,14 @@ from pyndn.util.blob import Blob
 from pyndn.util.signed_blob import SignedBlob
 from pyndn.util.change_counter import ChangeCounter
 from pyndn.name import Name
-from pyndn.meta_info import MetaInfo
+# from pyndn.meta_info import MetaInfo
 from pyndn.sha256_with_rsa_signature import Sha256WithRsaSignature
 from pyndn.lp.incoming_face_id import IncomingFaceId
 from pyndn.lp.congestion_mark import CongestionMark
 
 class Data(object):
     def __init__(self, value = None):
+        from pyndn.meta_info import MetaInfo
         if isinstance(value, Data):
             # Copy the values.
             self._name = ChangeCounter(Name(value.getName()))
@@ -109,10 +110,10 @@ class Data(object):
             wireFormat = WireFormat.getDefaultWireFormat()
 
         if isinstance(input, Blob):
-          # Input is a blob, so get its buf() and set copy False.
-          result = wireFormat.decodeData(self, input.buf(), False)
+            # Input is a blob, so get its buf() and set copy False.
+            result = wireFormat.decodeData(self, input.buf(), False)
         else:
-          result = wireFormat.decodeData(self, input, True)
+            result = wireFormat.decodeData(self, input, True)
         (signedPortionBeginOffset, signedPortionEndOffset) = result
 
         if wireFormat == WireFormat.getDefaultWireFormat():
@@ -268,6 +269,8 @@ class Data(object):
         :return: This Data so that you can chain calls to update values.
         :rtype: Data
         """
+        from pyndn.meta_info import MetaInfo
+        
         self._metaInfo.set(MetaInfo() if metaInfo == None
                                       else MetaInfo(metaInfo))
         self._changeCount += 1

@@ -196,7 +196,6 @@ class SegmentFetcher(object):
 
     def _fetchFirstSegment(self, baseInterest):
         interest = Interest(baseInterest)
-        interest.setChildSelector(1)
         interest.setMustBeFresh(True)
         self._face.expressInterest(interest, self._onData, self._onTimeout)
 
@@ -205,7 +204,6 @@ class SegmentFetcher(object):
         interest = Interest(originalInterest)
         # Changing a field clears the nonce so that the library will
         #   generate a new one.
-        interest.setChildSelector(0)
         interest.setMustBeFresh(False)
         interest.setName(dataName.getPrefix(-1).appendSegment(segment))
         self._face.expressInterest(interest, self._onData, self._onTimeout)
